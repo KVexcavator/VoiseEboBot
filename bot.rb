@@ -1,15 +1,16 @@
 require 'telegram/bot'
-require_relative 'env'
+require 'dotenv/load'
 
 botik = Telegram::Bot::Client
 max_voice_duration_sec = 30
 max_voice_file_size_bt = 1000000
+chatter = ->(b,m,t="Непонятно ничего"){b.api.send_message(chat_id: m.chat.id, text: t)}
 
-botik.run(TG_TOKEN) do |bot|
+botik.run(ENV['TG_TOKEN']) do |bot|
   bot.listen do |message|
     if message.text
       text = "Дай мне голосовое сообдение"
-      bot.api.send_message(chat_id: message.chat.id, text: text)
+      chatter.call(bot, message, text)
     elsif message.voice
       msg_duration_sec = message.voice.duration
       msg_file_size_bt = message.voice.file_size
@@ -23,14 +24,14 @@ botik.run(TG_TOKEN) do |bot|
                 Размер файла #{msg_file_size_bt} байт.
                 Расшифровка будет сей момент ..."
       end
-      bot.api.send_message(chat_id: message.chat.id, text: text)
+      chatter.call(bot, message, text)
 
       if service_open
-        bot.api.send_message(chat_id: message.chat.id, text: "Сезам откройся!")
+        text = "Сезам откройся!"
+        chatter.call(bot, message, text)
       end
     else
-      text = "Непонятно ничего"
-      bot.api.send_message(chat_id: message.chat.id, text: text)
+      chatter.call(bot, message)
     end
   end
 end
