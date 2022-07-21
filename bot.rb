@@ -1,12 +1,15 @@
 require 'telegram/bot'
 require 'dotenv/load'
+require 'json'
+require 'net/http'
 
+tg_token = ENV['TG_TOKEN']
 botik = Telegram::Bot::Client
 max_voice_duration_sec = 30
 max_voice_file_size_bt = 1000000
 chatter = ->(b,m,t="Непонятно ничего"){b.api.send_message(chat_id: m.chat.id, text: t)}
 
-botik.run(ENV['TG_TOKEN']) do |bot|
+botik.run(tg_token) do |bot|
   bot.listen do |message|
     if message.text
       text = "Дай мне голосовое сообдение"
@@ -27,8 +30,14 @@ botik.run(ENV['TG_TOKEN']) do |bot|
       chatter.call(bot, message, text)
 
       if service_open
+        url = "https://api.telegram.org/bot"+tg_token+"/getFile?file_id=" + message.voice.file_id
+        uri = URI(url)
+        response = Net::HTTP.get(uri)
+        path = JSON.parse(response)["result"]["file_path"]
+
+
         text = "Сезам откройся!"
-        chatter.call(bot, message, text)
+        chatter.call(bot, message, path)
       end
     else
       chatter.call(bot, message)
