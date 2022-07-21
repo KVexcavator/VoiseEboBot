@@ -30,14 +30,23 @@ botik.run(tg_token) do |bot|
       chatter.call(bot, message, text)
 
       if service_open
-        url = "https://api.telegram.org/bot"+tg_token+"/getFile?file_id=" + message.voice.file_id
-        uri = URI(url)
+        # path receiver
+        uri = URI("https://api.telegram.org/bot"+tg_token+"/getFile?file_id=" + message.voice.file_id)
         response = Net::HTTP.get(uri)
         path = JSON.parse(response)["result"]["file_path"]
 
+        # file receiver
+        uri = URI("https://api.telegram.org/file/bot"+tg_token+"/" + path)
+        system("curl #{uri} --output #{path} --silent")
 
-        text = "Сезам откройся!"
-        chatter.call(bot, message, path)
+        # catch text
+        chatter.call(bot, message, "Сходим на яндекс чтоли")
+
+        # extruct text
+        chatter.call(bot, message, "Здесь мы извлечем текст и выведем")
+
+        # cleaner tmp files
+        chatter.call(bot, message, "Приберемся за собой")
       end
     else
       chatter.call(bot, message)
