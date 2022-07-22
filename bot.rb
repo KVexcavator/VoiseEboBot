@@ -1,9 +1,12 @@
 require 'telegram/bot'
 require 'dotenv/load'
 require 'json'
+require 'uri'
 require 'net/http'
 
 tg_token = ENV['TG_TOKEN']
+iam_token = ENV['IAM_TOKEN']
+folder_id = ENV['FOLDER_ID']
 botik = Telegram::Bot::Client
 max_voice_duration_sec = 30
 max_voice_file_size_bt = 1000000
@@ -22,10 +25,7 @@ botik.run(tg_token) do |bot|
 
       if msg_duration_sec <= max_voice_duration_sec && msg_file_size_bt <= max_voice_file_size_bt
         service_open = true
-        text = "Да это волшебный голос.
-                Длительность #{msg_duration_sec} секунд.
-                Размер файла #{msg_file_size_bt} байт.
-                Расшифровка будет сей момент ..."
+        text = "Расшифровка будет сей момент ..."
       end
       chatter.call(bot, message, text)
 
@@ -40,13 +40,20 @@ botik.run(tg_token) do |bot|
         system("curl #{uri} --output #{path} --silent")
 
         # catch text
-        chatter.call(bot, message, "Сходим на яндекс чтоли")
+        url = URI.parse("https://stt.api.cloud.yandex.net/speech/v1/stt:recognize?folderId=#{folder_id}&lang=ru-RU")
+        header = {"Authorization": "Bearer #{iam_token}"}
+        req = Net::HTTP::Post.new(url.request_uri, header)
+        req.body = File.read(path)
+        http = Net::HTTP.new(url.host, url.port)
+        http.use_ssl = (url.scheme == "https")
+        response = http.request(req)
 
         # extruct text
-        chatter.call(bot, message, "Здесь мы извлечем текст и выведем")
+        result = JSON.parse(response.body)["result"]
+        chatter.call(bot, message, result)
 
         # cleaner tmp files
-        chatter.call(bot, message, "Приберемся за собой")
+        system("rm -f voice/*")
       end
     else
       chatter.call(bot, message)
