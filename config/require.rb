@@ -3,6 +3,7 @@ require 'dotenv/load'
 require 'json'
 require 'uri'
 require 'net/http'
+require 'faker'
 
 module SetBot
   def self.tg_token

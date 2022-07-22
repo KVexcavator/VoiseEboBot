@@ -25,13 +25,14 @@ Telegram::Bot::Client.run(SetBot::tg_token) do |bot|
 
         # file receiver
         uri = URI("https://api.telegram.org/file/bot"+SetBot::tg_token+"/" + path)
-        system("curl #{uri} --output #{path} --silent")
+        tmp_file = "tmp/#{Faker::Number.number(digits: 10).to_s}.oga"
+        system("curl #{uri} --output #{tmp_file} --silent")
 
         # catch text
         url = URI.parse("https://stt.api.cloud.yandex.net/speech/v1/stt:recognize?folderId=#{SetBot::folder_id}&lang=ru-RU")
         header = {"Authorization": "Bearer #{SetBot::iam_token}"}
         req = Net::HTTP::Post.new(url.request_uri, header)
-        req.body = File.read(path)
+        req.body = File.read(tmp_file)
         http = Net::HTTP.new(url.host, url.port)
         http.use_ssl = (url.scheme == "https")
         response = http.request(req)
@@ -40,7 +41,7 @@ Telegram::Bot::Client.run(SetBot::tg_token) do |bot|
         if result = JSON.parse(response.body)["result"]
           chatter.call(bot, message, result)
           # cleaner tmp files
-          system("rm -f voice/*")
+          system("rm -f #{tmp_file}")
         else
           chatter.call(bot, message, "Разраб спит, заходите позже")
         end
