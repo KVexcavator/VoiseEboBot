@@ -1,29 +1,17 @@
-require 'telegram/bot'
-require 'dotenv/load'
-require 'json'
-require 'uri'
-require 'net/http'
+require_relative 'config/require'
 
-tg_token = ENV['TG_TOKEN']
-iam_token = ENV['IAM_TOKEN']
-folder_id = ENV['FOLDER_ID']
-botik = Telegram::Bot::Client
-max_voice_duration_sec = 30
-max_voice_file_size_bt = 1000000
 chatter = ->(b,m,t="Непонятно ничего"){b.api.send_message(chat_id: m.chat.id, text: t)}
 
-botik.run(tg_token) do |bot|
+Telegram::Bot::Client.run(SetBot::tg_token) do |bot|
   bot.listen do |message|
     if message.text
       text = "Дай мне голосовое сообдение"
       chatter.call(bot, message, text)
     elsif message.voice
-      msg_duration_sec = message.voice.duration
-      msg_file_size_bt = message.voice.file_size
       service_open = false
       text = "Это слишком большое голосовое сообщение"
 
-      if msg_duration_sec <= max_voice_duration_sec && msg_file_size_bt <= max_voice_file_size_bt
+      if SetBot::duration_and_size_ok?(message.voice.duration, message.voice.file_size)
         service_open = true
         text = "Расшифровка будет сей момент ..."
       end
@@ -31,17 +19,17 @@ botik.run(tg_token) do |bot|
 
       if service_open
         # path receiver
-        uri = URI("https://api.telegram.org/bot"+tg_token+"/getFile?file_id=" + message.voice.file_id)
+        uri = URI("https://api.telegram.org/bot"+SetBot::tg_token+"/getFile?file_id=" + message.voice.file_id)
         response = Net::HTTP.get(uri)
         path = JSON.parse(response)["result"]["file_path"]
 
         # file receiver
-        uri = URI("https://api.telegram.org/file/bot"+tg_token+"/" + path)
+        uri = URI("https://api.telegram.org/file/bot"+SetBot::tg_token+"/" + path)
         system("curl #{uri} --output #{path} --silent")
 
         # catch text
-        url = URI.parse("https://stt.api.cloud.yandex.net/speech/v1/stt:recognize?folderId=#{folder_id}&lang=ru-RU")
-        header = {"Authorization": "Bearer #{iam_token}"}
+        url = URI.parse("https://stt.api.cloud.yandex.net/speech/v1/stt:recognize?folderId=#{SetBot::folder_id}&lang=ru-RU")
+        header = {"Authorization": "Bearer #{SetBot::iam_token}"}
         req = Net::HTTP::Post.new(url.request_uri, header)
         req.body = File.read(path)
         http = Net::HTTP.new(url.host, url.port)
@@ -49,11 +37,13 @@ botik.run(tg_token) do |bot|
         response = http.request(req)
 
         # extruct text
-        result = JSON.parse(response.body)["result"]
-        chatter.call(bot, message, result)
-
-        # cleaner tmp files
-        system("rm -f voice/*")
+        if result = JSON.parse(response.body)["result"]
+          chatter.call(bot, message, result)
+          # cleaner tmp files
+          system("rm -f voice/*")
+        else
+          chatter.call(bot, message, "Разраб спит, заходите позже")
+        end
       end
     else
       chatter.call(bot, message)
